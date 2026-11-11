@@ -1,0 +1,84 @@
+name: Build Offline Palm Attendance APK
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Prepare bundled offline AI runtime and models
+        env:
+          PALM_CCNET_MODEL_URL: ${{ secrets.PALM_CCNET_MODEL_URL }}
+        run: |
+          set -e
+          mkdir -p www/models www/mediapipe/wasm www/ort
+          cp node_modules/jsqr/dist/jsQR.js www/jsQR.js
+          cp node_modules/pdfjs-dist/build/pdf.min.js www/pdf.min.js
+          cp node_modules/pdfjs-dist/build/pdf.worker.min.js www/pdf.worker.min.js
+          cp node_modules/@mediapipe/tasks-vision/wasm/* www/mediapipe/wasm/
+          cp node_modules/onnxruntime-web/dist/*.wasm www/ort/
+          curl -fL --retry 3 \
+            https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task \
+            -o www/models/hand_landmarker.task
+          npm run build:palm
+          if [ -n "$PALM_CCNET_MODEL_URL" ]; then
+            echo "Downloading institution-approved CCNet model..."
+            curl -fL --retry 3 "$PALM_CCNET_MODEL_URL" -o www/models/palm_ccnet.onnx
+          elif [ -f models/palm_ccnet.onnx ]; then
+            cp models/palm_ccnet.onnx www/models/palm_ccnet.onnx
+          else
+            echo "WARNING: CCNet model not supplied. Hand landmark and challenge models are bundled, but palm identity registration/matching will remain disabled."
+          fi
+
+      - name: Set App ID
+        run: |
+          node -e '
+            const fs = require("fs");
+            const cfg = fs.existsSync("capacitor.config.json")
+              ? JSON.parse(fs.readFileSync("capacitor.config.json", "utf8"))
+              : { appName: "Palm Attendance", webDir: "www" };
+            cfg.appId = "com.yourorg.palmattendance"; // <-- Set your new App ID here
+            fs.writeFileSync("capacitor.config.json", JSON.stringify(cfg, null, 2));
+          '
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Configure Android camera and vibration permissions
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#</manifest>#  <uses-permission android:name="android.permission.CAMERA" />\n  <uses-permission android:name="android.permission.VIBRATE" />\n  <uses-feature android:name="android.hardware.camera" android:required="false" />\n</manifest>#' "$M"
+          sed -i 's#<activity#<activity android:screenOrientation="portrait"#' "$M"
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: zulu
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew clean assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: palm-attendance-offline-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
