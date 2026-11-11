@@ -1,0 +1,7 @@
+node_modules/
+android/
+www/ort/*.wasm
+www/mediapipe/wasm/*
+www/models/*.task
+www/models/*.onnx
+.DS_Store
