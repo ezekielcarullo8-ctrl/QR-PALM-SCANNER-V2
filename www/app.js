@@ -198,7 +198,8 @@ function refresh() {
   $("#oDup").checked = S.dup;
   $("#oLock").checked = S.lock;
   $("#oOnly").checked = S.only;
-  if ($("#cameraFacing")) $("#cameraFacing").value = S.cameraFacing || "environment";
+  if ($("#cameraFacing"))
+    $("#cameraFacing").value = S.cameraFacing || "environment";
   populatePalmStudents();
   renderPalmRecords();
   $("#rosterInfo").textContent = T
@@ -272,28 +273,79 @@ $("#absBtn").onclick = () => {
 };
 
 /* QR and palm attendance histories are intentionally independent. */
-if ($("#qrRecordsMode")) $("#qrRecordsMode").onclick = () => {
-  $("#qrRecordsPanel").classList.remove("hidden"); $("#palmRecordsPanel").classList.add("hidden");
-  $("#qrRecordsMode").classList.remove("ghost"); $("#palmRecordsMode").classList.add("ghost");
-};
-if ($("#palmRecordsMode")) $("#palmRecordsMode").onclick = () => {
-  $("#qrRecordsPanel").classList.add("hidden"); $("#palmRecordsPanel").classList.remove("hidden");
-  $("#palmRecordsMode").classList.remove("ghost"); $("#qrRecordsMode").classList.add("ghost"); renderPalmRecords();
-};
+if ($("#qrRecordsMode"))
+  $("#qrRecordsMode").onclick = () => {
+    $("#qrRecordsPanel").classList.remove("hidden");
+    $("#palmRecordsPanel").classList.add("hidden");
+    $("#qrRecordsMode").classList.remove("ghost");
+    $("#palmRecordsMode").classList.add("ghost");
+  };
+if ($("#palmRecordsMode"))
+  $("#palmRecordsMode").onclick = () => {
+    $("#qrRecordsPanel").classList.add("hidden");
+    $("#palmRecordsPanel").classList.remove("hidden");
+    $("#palmRecordsMode").classList.remove("ghost");
+    $("#qrRecordsMode").classList.add("ghost");
+    renderPalmRecords();
+  };
 if ($("#palmSearch")) $("#palmSearch").oninput = renderPalmRecords;
-if ($("#exportPalmCSV")) $("#exportPalmCSV").onclick = async () => {
-  const q = x => '"' + String(x).replace(/"/g,'""') + '"';
-  const lines = ["No.,Student No.,Name,Date,Time,Entry"];
-  palmRecords.slice().sort((a,b)=>a.time-b.time).forEach((r,i)=>lines.push([i+1,q(r.studentId),q(label(r.studentId)),r.date,fmtT(r.time),"Palm"].join(",")));
-  if (!palmRecords.length) return toast("No palm records to export");
-  const csv="\ufeff"+lines.join("\r\n"), name="palm_attendance_"+fmtD(Date.now())+".csv", P=window.Capacitor&&Capacitor.Plugins;
-  try { const w=await P.Filesystem.writeFile({path:name,data:csv,directory:"CACHE",encoding:"utf8"}); await P.Share.share({title:name,url:w.uri,dialogTitle:"Save or send palm attendance"}); }
-  catch(e){ if(e&&/cancel/i.test(e.message||""))return; const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=name;a.click(); }
-};
-if ($("#clearPalmRecords")) $("#clearPalmRecords").onclick = () => {
-  if (!palmRecords.length) return toast("No palm records to clear");
-  if (confirm("Clear all palm attendance records? QR attendance records will not be affected.")) { palmRecords=[];savePalmRecords();renderPalmRecords();toast("Palm records cleared"); }
-};
+if ($("#exportPalmCSV"))
+  $("#exportPalmCSV").onclick = async () => {
+    const q = (x) => '"' + String(x).replace(/"/g, '""') + '"';
+    const lines = ["No.,Student No.,Name,Date,Time,Entry"];
+    palmRecords
+      .slice()
+      .sort((a, b) => a.time - b.time)
+      .forEach((r, i) =>
+        lines.push(
+          [
+            i + 1,
+            q(r.studentId),
+            q(label(r.studentId)),
+            r.date,
+            fmtT(r.time),
+            "Palm",
+          ].join(","),
+        ),
+      );
+    if (!palmRecords.length) return toast("No palm records to export");
+    const csv = "\ufeff" + lines.join("\r\n"),
+      name = "palm_attendance_" + fmtD(Date.now()) + ".csv",
+      P = window.Capacitor && Capacitor.Plugins;
+    try {
+      const w = await P.Filesystem.writeFile({
+        path: name,
+        data: csv,
+        directory: "CACHE",
+        encoding: "utf8",
+      });
+      await P.Share.share({
+        title: name,
+        url: w.uri,
+        dialogTitle: "Save or send palm attendance",
+      });
+    } catch (e) {
+      if (e && /cancel/i.test(e.message || "")) return;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      a.download = name;
+      a.click();
+    }
+  };
+if ($("#clearPalmRecords"))
+  $("#clearPalmRecords").onclick = () => {
+    if (!palmRecords.length) return toast("No palm records to clear");
+    if (
+      confirm(
+        "Clear all palm attendance records? QR attendance records will not be affected.",
+      )
+    ) {
+      palmRecords = [];
+      savePalmRecords();
+      renderPalmRecords();
+      toast("Palm records cleared");
+    }
+  };
 
 /* scanning */
 const vid = $("#vid"),
@@ -311,7 +363,11 @@ async function startCam() {
   $("#camErr").classList.add("hidden");
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: S.cameraFacing || "environment" }, width: { ideal: 1280 }, height: { ideal: 1280 } },
+      video: {
+        facingMode: { ideal: S.cameraFacing || "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 1280 },
+      },
       audio: false,
     });
     vid.srcObject = stream;
@@ -322,7 +378,9 @@ async function startCam() {
     } catch (e) {}
   } catch (e) {
     stream = null;
-    $("#camErr").textContent = "Camera unavailable. Allow camera access, then try the other camera. " + (e.message || "");
+    $("#camErr").textContent =
+      "Camera unavailable. Allow camera access, then try the other camera. " +
+      (e.message || "");
     $("#camErr").classList.remove("hidden");
   }
 }
@@ -338,7 +396,10 @@ function stopCam() {
 function tick() {
   if (!stream) return;
   // Palm capture reads the video directly on demand; don't run QR canvas work in that mode.
-  if (scanMode !== "qr") { raf = requestAnimationFrame(tick); return; }
+  if (scanMode !== "qr") {
+    raf = requestAnimationFrame(tick);
+    return;
+  }
   if (vid.readyState >= 2 && vid.videoWidth) {
     const sc = Math.min(1, 640 / vid.videoWidth);
     cv.width = (vid.videoWidth * sc) | 0;
@@ -346,7 +407,9 @@ function tick() {
     cx.drawImage(vid, 0, 0, cv.width, cv.height);
     if (scanMode === "qr") {
       const d = cx.getImageData(0, 0, cv.width, cv.height),
-        r = jsQR(d.data, d.width, d.height, { inversionAttempts: "dontInvert" });
+        r = jsQR(d.data, d.width, d.height, {
+          inversionAttempts: "dontInvert",
+        });
       if (r && r.data && r.data.trim()) onCode(r.data.trim());
     }
   }
@@ -361,90 +424,214 @@ const PALM_DB = "palm-attendance-biometric-v2";
 const PALM_ATTENDANCE_KEY = "palm_attendance_records_v1";
 let palmBusy = false;
 let palmRecords = [];
-try { palmRecords = JSON.parse(localStorage.getItem(PALM_ATTENDANCE_KEY) || "[]"); } catch (_) { palmRecords = []; }
-function savePalmRecords() { localStorage.setItem(PALM_ATTENDANCE_KEY, JSON.stringify(palmRecords)); }
+try {
+  palmRecords = JSON.parse(localStorage.getItem(PALM_ATTENDANCE_KEY) || "[]");
+} catch (_) {
+  palmRecords = [];
+}
+function savePalmRecords() {
+  localStorage.setItem(PALM_ATTENDANCE_KEY, JSON.stringify(palmRecords));
+}
 function markPalmAttendance(studentId) {
   const day = fmtD(Date.now());
-  const existing = palmRecords.find(r => r.studentId === studentId && r.date === day);
-  if (existing) { toast("Already marked present by palm today"); palmStatus("Palm attendance already recorded for " + label(studentId) + " today."); return false; }
+  const existing = palmRecords.find(
+    (r) => r.studentId === studentId && r.date === day,
+  );
+  if (existing) {
+    toast("Already marked present by palm today");
+    palmStatus(
+      "Palm attendance already recorded for " + label(studentId) + " today.",
+    );
+    return false;
+  }
   palmRecords.push({ studentId, date: day, time: Date.now(), method: "Palm" });
   savePalmRecords();
   renderPalmRecords();
-  beep(880); if (S.vib && navigator.vibrate) navigator.vibrate(60);
+  beep(880);
+  if (S.vib && navigator.vibrate) navigator.vibrate(60);
   toast("Palm attendance recorded");
   return true;
 }
 function renderPalmRecords() {
-  const body = $("#palmTb"); if (!body) return;
-  const q = (($('#palmSearch') && $('#palmSearch').value) || '').trim().toLowerCase();
-  const rows = palmRecords.slice().sort((a,b)=>b.time-a.time).filter(r => (label(r.studentId)+r.studentId+r.date).toLowerCase().includes(q));
-  body.innerHTML = rows.map((r,i)=>`<tr><td>${i+1}</td><td><b>${esc(label(r.studentId))}</b><small>${esc(r.studentId)}</small></td><td class="t">${esc(r.date)} ${fmtT(r.time)}</td><td></td></tr>`).join("");
-  const count = $("#palmCnt"); if(count) count.textContent = rows.length + " palm records";
-  const empty = $("#palmEmpty"); if(empty) empty.classList.toggle("hidden", rows.length > 0);
+  const body = $("#palmTb");
+  if (!body) return;
+  const q = (($("#palmSearch") && $("#palmSearch").value) || "")
+    .trim()
+    .toLowerCase();
+  const rows = palmRecords
+    .slice()
+    .sort((a, b) => b.time - a.time)
+    .filter((r) =>
+      (label(r.studentId) + r.studentId + r.date).toLowerCase().includes(q),
+    );
+  body.innerHTML = rows
+    .map(
+      (r, i) =>
+        `<tr><td>${i + 1}</td><td><b>${esc(label(r.studentId))}</b><small>${esc(r.studentId)}</small></td><td class="t">${esc(r.date)} ${fmtT(r.time)}</td><td></td></tr>`,
+    )
+    .join("");
+  const count = $("#palmCnt");
+  if (count) count.textContent = rows.length + " palm records";
+  const empty = $("#palmEmpty");
+  if (empty) empty.classList.toggle("hidden", rows.length > 0);
 }
-function palmStatus(msg) { const el = $("#palmStatus"); if (el) el.textContent = msg; }
+function palmStatus(msg) {
+  const el = $("#palmStatus");
+  if (el) el.textContent = msg;
+}
 function populatePalmStudents() {
   const sel = $("#palmStudent");
   if (!sel) return;
   const old = sel.value;
-  sel.innerHTML = Object.entries(S.roster).sort((a,b)=>a[1].localeCompare(b[1]))
-    .map(([id,name]) => `<option value="${esc(id)}">${esc(name)} · ${esc(id)}</option>`).join("");
+  sel.innerHTML = Object.entries(S.roster)
+    .sort((a, b) => a[1].localeCompare(b[1]))
+    .map(
+      ([id, name]) =>
+        `<option value="${esc(id)}">${esc(name)} · ${esc(id)}</option>`,
+    )
+    .join("");
   if (old && S.roster[old]) sel.value = old;
 }
-function cosine(a,b) {
-  if(!a||!b||a.length!==b.length) return -1;
-  let dot=0,aa=0,bb=0;
-  for(let i=0;i<a.length;i++){dot+=a[i]*b[i];aa+=a[i]*a[i];bb+=b[i]*b[i];}
-  return dot/(Math.sqrt(aa*bb)||1);
+function cosine(a, b) {
+  if (!a || !b || a.length !== b.length) return -1;
+  let dot = 0,
+    aa = 0,
+    bb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    aa += a[i] * a[i];
+    bb += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(aa * bb) || 1);
 }
 function openPalmDB() {
-  return new Promise((resolve,reject)=>{
-    const req=indexedDB.open(PALM_DB,1);
-    req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains("templates"))db.createObjectStore("templates",{keyPath:"studentId"});if(!db.objectStoreNames.contains("keys"))db.createObjectStore("keys");};
-    req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(PALM_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("templates"))
+        db.createObjectStore("templates", { keyPath: "studentId" });
+      if (!db.objectStoreNames.contains("keys")) db.createObjectStore("keys");
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
   });
 }
 async function palmCryptoKey() {
-  if(!window.crypto || !crypto.subtle) throw new Error("Secure local storage is unavailable in this WebView.");
-  const db=await openPalmDB();
-  let key=await new Promise((resolve,reject)=>{
-    const tx=db.transaction("keys","readonly"),r=tx.objectStore("keys").get("device-key");
-    r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);
+  if (!window.crypto || !crypto.subtle)
+    throw new Error("Secure local storage is unavailable in this WebView.");
+  const db = await openPalmDB();
+  let key = await new Promise((resolve, reject) => {
+    const tx = db.transaction("keys", "readonly"),
+      r = tx.objectStore("keys").get("device-key");
+    r.onsuccess = () => resolve(r.result || null);
+    r.onerror = () => reject(r.error);
   });
-  if(!key){
-    key=await crypto.subtle.generateKey({name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
-    await new Promise((resolve,reject)=>{
-      const tx=db.transaction("keys","readwrite");tx.objectStore("keys").put(key,"device-key");
-      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+  if (!key) {
+    key = await crypto.subtle.generateKey(
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"],
+    );
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction("keys", "readwrite");
+      tx.objectStore("keys").put(key, "device-key");
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
     });
   }
-  db.close();return key;
+  db.close();
+  return key;
 }
-function toB64(buf){return btoa(String.fromCharCode(...new Uint8Array(buf)));}
-function fromB64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
+function toB64(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+function fromB64(s) {
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
 async function palmDBPut(record) {
-  const key=await palmCryptoKey(),iv=crypto.getRandomValues(new Uint8Array(12));
-  const plain=new TextEncoder().encode(JSON.stringify({descriptor:record.descriptor,samples:record.samples,updatedAt:record.updatedAt,descriptorVersion:record.descriptorVersion,model:record.model}));
-  const cipher=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,plain);
-  const db=await openPalmDB(),stored={studentId:record.studentId,iv:toB64(iv),cipher:toB64(cipher)};
-  return new Promise((resolve,reject)=>{const tx=db.transaction("templates","readwrite");tx.objectStore("templates").put(stored);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>{db.close();reject(tx.error);};});
+  const key = await palmCryptoKey(),
+    iv = crypto.getRandomValues(new Uint8Array(12));
+  const plain = new TextEncoder().encode(
+    JSON.stringify({
+      descriptor: record.descriptor,
+      samples: record.samples,
+      updatedAt: record.updatedAt,
+      descriptorVersion: record.descriptorVersion,
+      model: record.model,
+    }),
+  );
+  const cipher = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    plain,
+  );
+  const db = await openPalmDB(),
+    stored = {
+      studentId: record.studentId,
+      iv: toB64(iv),
+      cipher: toB64(cipher),
+    };
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("templates", "readwrite");
+    tx.objectStore("templates").put(stored);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+  });
 }
 async function palmDBGetAll() {
-  const db=await openPalmDB();
-  const rows=await new Promise((resolve,reject)=>{const tx=db.transaction("templates","readonly"),r=tx.objectStore("templates").getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});
-  db.close();const key=await palmCryptoKey(),out=[];
-  for(const row of rows){
-    try{
-      const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:fromB64(row.iv)},key,fromB64(row.cipher));
-      const record={studentId:row.studentId,...JSON.parse(new TextDecoder().decode(plain))};
-      if(record.descriptorVersion===2 && record.model==="CCNet")out.push(record);
-    }catch(e){console.warn("Skipping unreadable or incompatible palm template",row.studentId);}
+  const db = await openPalmDB();
+  const rows = await new Promise((resolve, reject) => {
+    const tx = db.transaction("templates", "readonly"),
+      r = tx.objectStore("templates").getAll();
+    r.onsuccess = () => resolve(r.result || []);
+    r.onerror = () => reject(r.error);
+  });
+  db.close();
+  const key = await palmCryptoKey(),
+    out = [];
+  for (const row of rows) {
+    try {
+      const plain = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: fromB64(row.iv) },
+        key,
+        fromB64(row.cipher),
+      );
+      const record = {
+        studentId: row.studentId,
+        ...JSON.parse(new TextDecoder().decode(plain)),
+      };
+      if (record.descriptorVersion === 2 && record.model === "CCNet")
+        out.push(record);
+    } catch (e) {
+      console.warn(
+        "Skipping unreadable or incompatible palm template",
+        row.studentId,
+      );
+    }
   }
   return out;
 }
 async function palmDBDelete(id) {
-  const db=await openPalmDB();
-  return new Promise((resolve,reject)=>{const tx=db.transaction("templates","readwrite");tx.objectStore("templates").delete(id);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>{db.close();reject(tx.error);};});
+  const db = await openPalmDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("templates", "readwrite");
+    tx.objectStore("templates").delete(id);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+  });
 }
 
 /* Portable, password-encrypted palm backup. The device AES key is never exported.
@@ -469,17 +656,32 @@ function b64ToBytes(value) {
 }
 async function backupKeyFromPassword(password, salt) {
   const material = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"],
   );
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: PALM_BACKUP_ITERATIONS, hash: "SHA-256" },
-    material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: PALM_BACKUP_ITERATIONS,
+      hash: "SHA-256",
+    },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
   );
 }
 function askBackupPassword(confirmPassword) {
-  const password = prompt("Create a backup password (at least 10 characters). You will need this password on the other phone:");
+  const password = prompt(
+    "Create a backup password (at least 10 characters). You will need this password on the other phone:",
+  );
   if (password === null) return null;
-  if (password.length < 10) throw new Error("Use a backup password with at least 10 characters.");
+  if (password.length < 10)
+    throw new Error("Use a backup password with at least 10 characters.");
   if (confirmPassword) {
     const again = prompt("Enter the backup password again to confirm:");
     if (again === null) return null;
@@ -488,24 +690,41 @@ function askBackupPassword(confirmPassword) {
   return password;
 }
 function validatePalmBackupPayload(payload) {
-  if (!payload || payload.schema !== PALM_BACKUP_FORMAT || payload.version !== PALM_BACKUP_VERSION)
+  if (
+    !payload ||
+    payload.schema !== PALM_BACKUP_FORMAT ||
+    payload.version !== PALM_BACKUP_VERSION
+  )
     throw new Error("This is not a supported Palm Attendance backup.");
   if (!Array.isArray(payload.templates) || !payload.templates.length)
     throw new Error("The backup contains no registered palm templates.");
   for (const r of payload.templates) {
-    if (!r || typeof r.studentId !== "string" || !r.studentId.trim() ||
-        !Array.isArray(r.descriptor) || !r.descriptor.length ||
-        !r.descriptor.every(v => Number.isFinite(v)) ||
-        r.descriptorVersion !== 2 || r.model !== "CCNet")
-      throw new Error("The backup contains an invalid or incompatible palm template.");
+    if (
+      !r ||
+      typeof r.studentId !== "string" ||
+      !r.studentId.trim() ||
+      !Array.isArray(r.descriptor) ||
+      !r.descriptor.length ||
+      !r.descriptor.every((v) => Number.isFinite(v)) ||
+      r.descriptorVersion !== 2 ||
+      r.model !== "CCNet"
+    )
+      throw new Error(
+        "The backup contains an invalid or incompatible palm template.",
+      );
   }
-  if (!payload.roster || typeof payload.roster !== "object" || Array.isArray(payload.roster))
+  if (
+    !payload.roster ||
+    typeof payload.roster !== "object" ||
+    Array.isArray(payload.roster)
+  )
     throw new Error("The backup student roster is invalid.");
 }
 async function exportPalmBackup() {
   try {
     const records = await palmDBGetAll();
-    if (!records.length) return toast("No registered palm templates to export.");
+    if (!records.length)
+      return toast("No registered palm templates to export.");
     const password = askBackupPassword(true);
     if (password === null) return;
     const payload = {
@@ -515,14 +734,18 @@ async function exportPalmBackup() {
       createdAt: new Date().toISOString(),
       templateCount: records.length,
       roster: S.roster,
-      templates: records
+      templates: records,
     };
     validatePalmBackupPayload(payload);
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const key = await backupKeyFromPassword(password, salt);
     const plain = new TextEncoder().encode(JSON.stringify(payload));
-    const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plain);
+    const cipher = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      plain,
+    );
     const envelope = {
       format: PALM_BACKUP_FORMAT,
       version: PALM_BACKUP_VERSION,
@@ -531,28 +754,41 @@ async function exportPalmBackup() {
       cipher: "AES-256-GCM",
       salt: bytesToB64(salt),
       iv: bytesToB64(iv),
-      data: bytesToB64(new Uint8Array(cipher))
+      data: bytesToB64(new Uint8Array(cipher)),
     };
-    const filename = "Palm_Attendance_Backup_" + new Date().toISOString().replace(/[:.]/g, "-") + ".palmbackup";
+    const filename =
+      "Palm_Attendance_Backup_" +
+      new Date().toISOString().replace(/[:.]/g, "-") +
+      ".palmbackup";
     const json = JSON.stringify(envelope);
     const P = window.Capacitor && window.Capacitor.Plugins;
     if (P && P.Filesystem && P.Share) {
       const written = await P.Filesystem.writeFile({
-        path: filename, data: json, directory: "CACHE", encoding: "utf8"
+        path: filename,
+        data: json,
+        directory: "CACHE",
+        encoding: "utf8",
       });
       await P.Share.share({
         title: "Palm Attendance encrypted backup",
         text: "Encrypted palm registrations and student roster. Keep the backup password safe.",
         url: written.uri,
-        dialogTitle: "Share Palm Attendance backup"
+        dialogTitle: "Share Palm Attendance backup",
       });
     } else {
       const blob = new Blob([json], { type: "application/octet-stream" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
       setTimeout(() => URL.revokeObjectURL(url), 30000);
     }
-    palmStatus("Encrypted backup created for " + records.length + " registered palms. Transfer the file and password separately.");
+    palmStatus(
+      "Encrypted backup created for " +
+        records.length +
+        " registered palms. Transfer the file and password separately.",
+    );
     toast("Palm backup ready to share");
   } catch (e) {
     palmStatus("Palm backup export failed: " + (e.message || e));
@@ -563,36 +799,52 @@ async function importPalmBackup(file) {
   if (!file) return;
   try {
     const envelope = JSON.parse(await file.text());
-    if (!envelope || envelope.format !== PALM_BACKUP_FORMAT || envelope.version !== PALM_BACKUP_VERSION ||
-        envelope.kdf !== "PBKDF2-SHA256" || envelope.cipher !== "AES-256-GCM" ||
-        envelope.iterations !== PALM_BACKUP_ITERATIONS)
+    if (
+      !envelope ||
+      envelope.format !== PALM_BACKUP_FORMAT ||
+      envelope.version !== PALM_BACKUP_VERSION ||
+      envelope.kdf !== "PBKDF2-SHA256" ||
+      envelope.cipher !== "AES-256-GCM" ||
+      envelope.iterations !== PALM_BACKUP_ITERATIONS
+    )
       throw new Error("Unsupported or damaged backup file.");
-    const password = prompt("Enter the password used when this Palm Attendance backup was exported:");
+    const password = prompt(
+      "Enter the password used when this Palm Attendance backup was exported:",
+    );
     if (password === null) return;
     let plain;
     try {
-      const key = await backupKeyFromPassword(password, b64ToBytes(envelope.salt));
+      const key = await backupKeyFromPassword(
+        password,
+        b64ToBytes(envelope.salt),
+      );
       plain = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: b64ToBytes(envelope.iv) }, key, b64ToBytes(envelope.data)
+        { name: "AES-GCM", iv: b64ToBytes(envelope.iv) },
+        key,
+        b64ToBytes(envelope.data),
       );
     } catch (_) {
-      throw new Error("Incorrect backup password or the backup file is damaged.");
+      throw new Error(
+        "Incorrect backup password or the backup file is damaged.",
+      );
     }
     const payload = JSON.parse(new TextDecoder().decode(plain));
     validatePalmBackupPayload(payload);
     const existing = await palmDBGetAll();
-    const incomingIds = new Set(payload.templates.map(r => r.studentId));
-    const overlap = existing.filter(r => incomingIds.has(r.studentId)).length;
+    const incomingIds = new Set(payload.templates.map((r) => r.studentId));
+    const overlap = existing.filter((r) => incomingIds.has(r.studentId)).length;
     const choice = confirm(
       `Import ${payload.templates.length} registered palm templates and ${Object.keys(payload.roster).length} roster entries?\n` +
-      `${overlap} student palm template(s) already exist on this phone and will be replaced.\n\n` +
-      "Choose OK to merge the backup. Choose Cancel to stop."
+        `${overlap} student palm template(s) already exist on this phone and will be replaced.\n\n` +
+        "Choose OK to merge the backup. Choose Cancel to stop.",
     );
     if (!choice) return;
     // Validate every record before writing; each device encrypts templates with its own local key.
     for (const r of payload.templates) {
       if (!payload.roster[r.studentId] && !S.roster[r.studentId])
-        throw new Error("A palm template refers to a student missing from the backup roster.");
+        throw new Error(
+          "A palm template refers to a student missing from the backup roster.",
+        );
     }
     const previousRoster = S.roster;
     S.roster = Object.assign({}, S.roster, payload.roster);
@@ -604,105 +856,214 @@ async function importPalmBackup(file) {
       S.roster = previousRoster;
       throw writeError;
     }
-    palmStatus(`Imported ${payload.templates.length} palm templates. This phone is ready for offline palm attendance, subject to model availability.`);
+    palmStatus(
+      `Imported ${payload.templates.length} palm templates. This phone is ready for offline palm attendance, subject to model availability.`,
+    );
     toast("Palm registrations imported");
   } catch (e) {
     palmStatus("Palm backup import failed: " + (e.message || e));
     alert("Could not import Palm Attendance backup.\n" + (e.message || e));
   }
 }
+function friendlyPalmModelError(error) {
+  const raw = String(
+    (error && (error.message || error)) || "Unknown model error",
+  );
+  if (
+    /palm_ccnet\\.onnx|failed to load external data file|no such file|not found/i.test(
+      raw,
+    )
+  ) {
+    return "The trained CCNet palm model is not installed in this app. Add an authorized palm_ccnet.onnx model to www/models/ and rebuild the APK. QR and manual attendance are still available.";
+  }
+  if (/PalmEngine|offline palm engine is missing/i.test(raw)) {
+    return "The offline palm engine is missing from this build. Restore www/palm-engine.js and rebuild the APK. QR and manual attendance are still available.";
+  }
+  return raw;
+}
+
 async function ensurePalmModel() {
-  if(!window.PalmEngine)throw new Error("Offline palm engine is missing from this build.");
+  if (!window.PalmEngine || typeof window.PalmEngine.initPalm !== "function") {
+    throw new Error(
+      "The offline palm engine is missing from this build. QR and manual attendance are still available.",
+    );
+  }
   palmStatus("Loading offline hand and palm AI models…");
-  await window.PalmEngine.initPalm();
+  try {
+    await window.PalmEngine.initPalm();
+  } catch (error) {
+    throw new Error(friendlyPalmModelError(error));
+  }
 }
 async function runLiveness() {
   palmStatus("Starting randomized liveness challenge…");
-  await window.PalmEngine.livenessChallenge(vid, msg=>palmStatus("Liveness check: "+msg));
+  await window.PalmEngine.livenessChallenge(vid, (msg) =>
+    palmStatus("Liveness check: " + msg),
+  );
   palmStatus("Liveness challenge passed. Capturing palm features…");
 }
-async function captureSamples(count, gapMs=500) {
-  const samples=[];
-  for(let i=0;i<count;i++){
-    palmStatus(`Extracting trained palm embedding ${i+1} of ${count}. Keep your palm steady…`);
-    await new Promise(r=>setTimeout(r,gapMs));
+async function captureSamples(count, gapMs = 500) {
+  const samples = [];
+  for (let i = 0; i < count; i++) {
+    palmStatus(
+      `Extracting trained palm embedding ${i + 1} of ${count}. Keep your palm steady…`,
+    );
+    await new Promise((r) => setTimeout(r, gapMs));
     samples.push(await window.PalmEngine.capture(vid));
   }
   return samples;
 }
 function averageDescriptors(samples) {
-  const out=new Array(samples[0].length).fill(0);
-  samples.forEach(s=>s.forEach((v,i)=>out[i]+=v/samples.length));
-  let n=Math.sqrt(out.reduce((a,v)=>a+v*v,0))||1;
-  return out.map(v=>v/n);
+  const out = new Array(samples[0].length).fill(0);
+  samples.forEach((s) => s.forEach((v, i) => (out[i] += v / samples.length)));
+  let n = Math.sqrt(out.reduce((a, v) => a + v * v, 0)) || 1;
+  return out.map((v) => v / n);
 }
 async function registerPalm() {
-  if(palmBusy)return;
-  const id=$("#palmStudent").value;
-  if(!id)return toast("Import or select a student first.");
-  if(!S.roster[id])return toast("Selected student is not in the class list.");
+  if (palmBusy) return;
+  const id = $("#palmStudent").value;
+  if (!id) return toast("Import or select a student first.");
+  if (!S.roster[id]) return toast("Selected student is not in the class list.");
   // In-app consent checkbox avoids unreliable confirm() dialogs in Android WebView.
-  const consent=$("#palmConsent");
-  if(!consent || !consent.checked){
-    palmStatus("Registration paused. Obtain the student's voluntary consent, then check the consent box and press Register palm again. QR/manual attendance remains available.");
+  const consent = $("#palmConsent");
+  if (!consent || !consent.checked) {
+    palmStatus(
+      "Registration paused. Obtain the student's voluntary consent, then check the consent box and press Register palm again. QR/manual attendance remains available.",
+    );
     toast("Consent is required before palm registration.");
     return;
   }
-  palmBusy=true;
-  try{
-    if(!stream)await startCam();
-    if(!stream)throw new Error("Camera permission is required.");
+  palmBusy = true;
+  try {
+    if (!stream) await startCam();
+    if (!stream) throw new Error("Camera permission is required.");
     await ensurePalmModel();
     await runLiveness();
-    const samples=await captureSamples(3);
-    await palmDBPut({studentId:id,descriptor:averageDescriptors(samples),samples:3,updatedAt:Date.now(),descriptorVersion:2,model:"CCNet"});
-    palmStatus("Trained-model palm template registered for "+label(id)+". This model still requires local accuracy validation.");
+    const samples = await captureSamples(3);
+    await palmDBPut({
+      studentId: id,
+      descriptor: averageDescriptors(samples),
+      samples: 3,
+      updatedAt: Date.now(),
+      descriptorVersion: 2,
+      model: "CCNet",
+    });
+    palmStatus(
+      "Trained-model palm template registered for " +
+        label(id) +
+        ". This model still requires local accuracy validation.",
+    );
     toast("Palm registered");
-  }catch(e){palmStatus("Registration unavailable: "+(e.message||e));}
-  finally{palmBusy=false;}
+  } catch (e) {
+    palmStatus("Registration unavailable: " + (e.message || e));
+  } finally {
+    palmBusy = false;
+  }
 }
 async function scanPalm() {
-  if(palmBusy)return;
-  palmBusy=true;
-  try{
-    if(!stream)await startCam();
-    if(!stream)throw new Error("Camera permission is required.");
+  if (palmBusy) return;
+  palmBusy = true;
+  try {
+    if (!stream) await startCam();
+    if (!stream) throw new Error("Camera permission is required.");
     await ensurePalmModel();
     await runLiveness();
-    const probe=averageDescriptors(await captureSamples(2,350));
-    const records=await palmDBGetAll();
-    if(!records.length){palmStatus("No compatible CCNet palm templates registered yet.");return;}
-    const ranked=records.map(r=>({r,score:cosine(probe,r.descriptor)})).sort((a,b)=>b.score-a.score);
-    const best=ranked[0], second=ranked[1];
-    // Provisional threshold only. It is NOT a calibrated FAR/FRR operating point.
-    if(!best || best.score<0.88 || (second && best.score-second.score<0.04)){
-      palmStatus("No sufficiently separated match. Try again or use QR/manual attendance.");
-      beep(220);return;
+    const probe = averageDescriptors(await captureSamples(2, 350));
+    const records = await palmDBGetAll();
+    if (!records.length) {
+      palmStatus("No compatible CCNet palm templates registered yet.");
+      return;
     }
-    const student=label(best.r.studentId);
-    const accepted=confirm(`Possible palm match: ${student}\nRaw cosine score: ${best.score.toFixed(3)} (not a probability)\n\nConfirm attendance?`);
-    if(accepted){const saved=markPalmAttendance(best.r.studentId);if(saved)palmStatus("Palm attendance recorded for "+student+" after manual confirmation.");}
-    else palmStatus("Match rejected. No attendance recorded.");
-  }catch(e){palmStatus("Palm scan unavailable: "+(e.message||e));}
-  finally{palmBusy=false;}
+    const ranked = records
+      .map((r) => ({ r, score: cosine(probe, r.descriptor) }))
+      .sort((a, b) => b.score - a.score);
+    const best = ranked[0],
+      second = ranked[1];
+    // Provisional threshold only. It is NOT a calibrated FAR/FRR operating point.
+    if (
+      !best ||
+      best.score < 0.88 ||
+      (second && best.score - second.score < 0.04)
+    ) {
+      palmStatus(
+        "No sufficiently separated match. Try again or use QR/manual attendance.",
+      );
+      beep(220);
+      return;
+    }
+    const student = label(best.r.studentId);
+    const accepted = confirm(
+      `Possible palm match: ${student}\nRaw cosine score: ${best.score.toFixed(3)} (not a probability)\n\nConfirm attendance?`,
+    );
+    if (accepted) {
+      const saved = markPalmAttendance(best.r.studentId);
+      if (saved)
+        palmStatus(
+          "Palm attendance recorded for " +
+            student +
+            " after manual confirmation.",
+        );
+    } else palmStatus("Match rejected. No attendance recorded.");
+  } catch (e) {
+    palmStatus("Palm scan unavailable: " + (e.message || e));
+  } finally {
+    palmBusy = false;
+  }
 }
-$("#cameraFacing").onchange=async e=>{
-  S.cameraFacing=e.target.value;save();
-  if($("#scan").classList.contains("on")){stopCam();await startCam();}
+$("#cameraFacing").onchange = async (e) => {
+  S.cameraFacing = e.target.value;
+  save();
+  if ($("#scan").classList.contains("on")) {
+    stopCam();
+    await startCam();
+  }
 };
-$("#qrMode").onclick=()=>{scanMode="qr";$("#qrMode").classList.remove("ghost");$("#palmMode").classList.add("ghost");$("#qrControls").classList.remove("hidden");$("#palmControls").classList.add("hidden");palmStatus("QR scanning mode.");};
-$("#palmMode").onclick=async()=>{scanMode="palm";$("#palmMode").classList.remove("ghost");$("#qrMode").classList.add("ghost");$("#qrControls").classList.add("hidden");$("#palmControls").classList.remove("hidden");try{if(!stream)await startCam();await window.PalmEngine.initHand();palmStatus("Offline hand detection ready. Load the licensed CCNet model to enable palm identity matching.");}catch(e){palmStatus("Offline hand model unavailable: "+e.message);}};
-$("#registerPalm").onclick=registerPalm;
-$("#scanPalm").onclick=scanPalm;
-$("#deletePalm").onclick=async()=>{
-  const id=$("#palmStudent").value;if(!id)return toast("Select a student.");
-  if(!confirm("Permanently delete this student's palm template from this device?"))return;
-  try{await palmDBDelete(id);palmStatus("Palm template deleted.");toast("Template deleted");}
-  catch(e){palmStatus("Could not delete template: "+e.message);}
+$("#qrMode").onclick = () => {
+  scanMode = "qr";
+  $("#qrMode").classList.remove("ghost");
+  $("#palmMode").classList.add("ghost");
+  $("#qrControls").classList.remove("hidden");
+  $("#palmControls").classList.add("hidden");
+  palmStatus("QR scanning mode.");
+};
+$("#palmMode").onclick = async () => {
+  scanMode = "palm";
+  $("#palmMode").classList.remove("ghost");
+  $("#qrMode").classList.add("ghost");
+  $("#qrControls").classList.add("hidden");
+  $("#palmControls").classList.remove("hidden");
+  try {
+    if (!stream) await startCam();
+    await window.PalmEngine.initHand();
+    palmStatus(
+      "Offline hand detection ready. Load the licensed CCNet model to enable palm identity matching.",
+    );
+  } catch (e) {
+    palmStatus("Offline hand model unavailable: " + friendlyPalmModelError(e));
+  }
+};
+$("#registerPalm").onclick = registerPalm;
+$("#scanPalm").onclick = scanPalm;
+$("#deletePalm").onclick = async () => {
+  const id = $("#palmStudent").value;
+  if (!id) return toast("Select a student.");
+  if (
+    !confirm(
+      "Permanently delete this student's palm template from this device?",
+    )
+  )
+    return;
+  try {
+    await palmDBDelete(id);
+    palmStatus("Palm template deleted.");
+    toast("Template deleted");
+  } catch (e) {
+    palmStatus("Could not delete template: " + e.message);
+  }
 };
 $("#exportPalmBackup").onclick = exportPalmBackup;
 $("#importPalmBackup").onclick = () => $("#palmBackupFile").click();
-$("#palmBackupFile").onchange = e => {
+$("#palmBackupFile").onchange = (e) => {
   const file = e.target.files && e.target.files[0];
   e.target.value = "";
   if (file) importPalmBackup(file);
